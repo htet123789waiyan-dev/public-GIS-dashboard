@@ -1,0 +1,1313 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public GIS Dashboard</title>
+
+    
+
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@3.0.2/Control.FullScreen.css"
+/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@3.0.2/Control.FullScreen.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f6fa;
+            color: #1f2937;
+        }
+
+        header {
+            background: #173b67;
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0 0 8px;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: auto;
+            padding: 24px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card, .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px #00000010;
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: #526175;
+        }
+
+        .number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #173b67;
+        }
+
+        .panel {
+            margin-bottom: 24px;
+        }
+
+        #map-placeholder {
+            min-height: 320px;
+            background: #e2eaf2;
+            border: 2px dashed #9aafc4;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            color: #40556b;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #64748b;
+        }
+
+        @media (max-width: 650px) {
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            main {
+                padding: 14px;
+            }
+        }
+
+        #map {
+            height: 450px;
+            width: 100%;
+            border-radius: 8px;
+            z-index: 1;
+            position: relative;
+        }
+
+        
+        
+#map:fullscreen,
+#map:-webkit-full-screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+}
+
+#map.leaflet-fullscreen-on {
+    border-radius: 0;
+}
+
+
+/* Map legend */
+.map-legend {
+    background: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px #00000025;
+    line-height: 1.8;
+    color: #1f2937;
+    font-size: 14px;
+}
+
+.map-legend h4 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    color: #173b67;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.legend-line {
+    display: inline-block;
+    width: 24px;
+    height: 4px;
+    border-radius: 2px;
+}
+
+.legend-square {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+}
+
+
+/* Map search */
+.map-search {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.map-search input {
+    flex: 1;
+    min-width: 0;
+    padding: 11px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.map-search button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    background: #173b67;
+    color: white;
+    cursor: pointer;
+}
+
+.map-search button:hover {
+    background: #24558b;
+}
+
+#search-message {
+    font-size: 13px;
+    color: #64748b;
+    margin: 8px 0 12px;
+}
+
+@media (max-width: 500px) {
+    .map-search {
+        flex-wrap: wrap;
+    }
+
+    .map-search input {
+        flex-basis: 100%;
+    }
+}
+
+
+#search-results-list {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #1f2937;
+
+    /* Limit the results box height */
+    max-height: 180px;
+
+    /* Show a scrollbar when results exceed the height */
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    /* Keep the box within its parent width */
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.search-result-item {
+    padding: 8px;
+    margin-bottom: 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+
+    /* Prevent long names from stretching the box */
+    overflow-wrap: anywhere;
+}
+
+.search-result-item:hover {
+    background: #f3f4f6;
+}
+
+
+/* Floating search results window */
+.search-results-window {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 1000;
+
+    width: 300px;
+    max-width: calc(100% - 30px);
+    max-height: 320px;
+
+    display: none;
+    flex-direction: column;
+
+    background: #ffffff;
+    color: #1f2937;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.search-results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+
+    padding: 12px 14px;
+    background: #f3f4f6;
+    border-bottom: 1px solid #e5e7eb;
+
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+.search-results-header:active {
+    cursor: grabbing;
+}
+
+#close-search-results {
+    border: none;
+    background: transparent;
+    color: #374151;
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+#search-message {
+    margin: 10px 14px;
+    font-size: 13px;
+}
+
+#search-results-list {
+    padding: 0 12px 12px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 210px;
+}
+
+.search-result-item {
+    padding: 9px;
+    margin-bottom: 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+.search-result-item:hover {
+    background: #f3f4f6;
+}
+
+
+.search-result-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1f2937;
+    overflow-wrap: anywhere;
+    margin-bottom: 5px;
+}
+
+.search-result-type {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 8px;
+}
+
+.search-result-zoom {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 5px;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.search-result-zoom:hover {
+    background: #1d4ed8;
+}
+
+
+
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Public GIS Dashboard</h1>
+        <p>Explore geographic data, maps, and statistics</p>
+    </header>
+
+    <main>
+        
+<section class="stats">
+    <div class="card">
+        <h3>Total Roads</h3>
+        <div class="number" id="roads-count">0</div>
+    </div>
+
+    <div class="card">
+        <h3>Pathein Ward B Features</h3>
+        <div class="number" id="ward-count">0</div>
+    </div>
+
+    <div class="card">
+        <h3>Street Lights</h3>
+        <div class="number" id="streetlight-count">0</div>
+    </div>
+</section>
+
+
+        
+
+<section class="panel">
+    <h2>Interactive Map</h2>
+
+    <div class="map-search">
+        <input
+            type="text"
+            id="map-search-input"
+            placeholder="Search roads, locations, or features..."
+        />
+
+        <button type="button" id="map-search-button">
+            Search
+        </button>
+
+        <button type="button" id="map-reset-button">
+            Reset
+        </button>
+
+        
+        <button type="button" id="map-clear-button">
+            Clear Results
+        </button>
+
+    </div>
+
+    <div id="map">
+        <!-- Only ONE floating window -->
+        <div id="search-results-window"
+             class="search-results-window">
+
+            <div class="search-results-header">
+                <strong id="search-results-title">
+                    Search Results
+                </strong>
+
+                <button
+                    type="button"
+                    id="close-search-results"
+                    aria-label="Close search results"
+                >&times;</button>
+            </div>
+
+            <p id="search-message" role="status">
+                Enter a keyword to search the map.
+            </p>
+
+            <div id="search-results-list"></div>
+        </div>
+    </div>
+</section>
+
+
+
+        
+<section class="panel">
+    <h2>GIS Statistics</h2>
+    <p>Feature count by GIS layer</p>
+
+    <div style="position: relative; height: 350px; width: 100%;">
+        <canvas id="gisChart"></canvas>
+    </div>
+</section>
+
+    </main>
+
+    <footer>
+        Public GIS Website
+    </footer>
+
+    
+    <script>
+        const map = L.map('map').setView([16.78674449632533, 94.73403458957743], 12);
+        
+L.control.fullscreen({
+    position: 'topleft',
+    title: 'View Fullscreen',
+    titleCancel: 'Exit Fullscreen',
+    forceSeparateButton: true
+}).addTo(map);
+
+
+map.on('fullscreenchange', () => {
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 150);
+});
+
+
+    
+ // Feature popup
+function addFeaturePopup(feature, layer) {
+    const properties = feature.properties || {};
+    const popup = document.createElement('div');
+
+    Object.entries(properties).forEach(([key, value]) => {
+        const row = document.createElement('div');
+        const label = document.createElement('strong');
+
+        label.textContent = key + ': ';
+        row.appendChild(label);
+        row.appendChild(
+            document.createTextNode(String(value ?? ''))
+        );
+        popup.appendChild(row);
+    });
+
+    if (popup.childNodes.length > 0) {
+        layer.bindPopup(popup);
+    }
+}
+
+// Roads layer
+const roadsLayer = L.geoJSON(null, {
+    style: {
+        color: '#e63946',
+        weight: 3,
+        opacity: 0.9
+    },
+    onEachFeature: addFeaturePopup
+});
+
+// Pathein Ward B layer
+const wardLayer = L.geoJSON(null, {
+    style: {
+        color: '#7c3aed',
+        fillColor: '#a78bfa',
+        weight: 2,
+        fillOpacity: 0.35
+    },
+    pointToLayer: (feature, latlng) => {
+        return L.circleMarker(latlng, {
+            radius: 5,
+            color: '#7c3aed',
+            fillColor: '#a78bfa',
+            fillOpacity: 0.8
+        });
+    },
+    onEachFeature: addFeaturePopup
+});
+
+let streetLightLayer = null;
+
+// Keep the original GIS data for resetting
+let roadsGeoJSONData = null;
+let wardGeoJSONData = null;
+let streetLightGeoJSONData = null;
+
+
+ // Load all three GeoJSON files
+Promise.all([
+    fetch('data/Pathein_Road_FeaturesToJSON.geojson')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(
+                    'Could not load Pathein_Road_FeaturesToJSON.geojson'
+                );
+            }
+            return response.json();
+        }),
+
+    fetch('data/PATHEIN_WARD_B_FeaturesToJSO.geojson')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(
+                    'Could not load PATHEIN_WARD_B_FeaturesToJSO.geojson'
+                );
+            }
+            return response.json();
+        }),
+
+    fetch('data/TSP_Street_Lig_FeaturesToJSO.geojson')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(
+                    'Could not load TSP_Street_Lig_FeaturesToJSO.geojson'
+                );
+            }
+            return response.json();
+        })
+])
+.then(([roadsData, wardData, streetLightData]) => {
+
+// Save original data so Reset can rebuild the layers
+roadsGeoJSONData = roadsData;
+wardGeoJSONData = wardData;
+streetLightGeoJSONData = streetLightData;
+
+    // Add data to existing layers
+    roadsLayer.addData(roadsData);
+    wardLayer.addData(wardData);
+
+    // Create the street light layer
+    streetLightLayer = L.geoJSON(streetLightData, {
+        pointToLayer: (feature, latlng) => {
+            return L.circleMarker(latlng, {
+                radius: 5,
+                color: '#d97706',
+                fillColor: '#facc15',
+                fillOpacity: 0.9,
+                weight: 1
+            });
+        },
+
+        style: {
+            color: '#d97706',
+            weight: 2,
+            fillColor: '#facc15',
+            fillOpacity: 0.6
+        },
+
+        onEachFeature: addFeaturePopup
+    });
+
+    // Display all three layers initially
+    roadsLayer.addTo(map);
+    wardLayer.addTo(map);
+    streetLightLayer.addTo(map);
+
+    
+document.getElementById('roads-count').textContent =
+    roadsLayer.getLayers().length;
+
+document.getElementById('ward-count').textContent =
+    wardLayer.getLayers().length;
+
+document.getElementById('streetlight-count').textContent =
+    streetLightLayer.getLayers().length;
+
+    
+const roadsCount = roadsLayer.getLayers().length;
+const wardCount = wardLayer.getLayers().length;
+const streetLightCount = streetLightLayer.getLayers().length;
+
+const chartCanvas = document.getElementById('gisChart');
+
+new Chart(chartCanvas, {
+    type: 'bar',
+
+    data: {
+        labels: [
+            'Roads',
+            'Pathein Ward B',
+            'Street Lights'
+        ],
+
+        datasets: [{
+            label: 'Number of Features',
+
+            data: [
+                roadsCount,
+                wardCount,
+                streetLightCount
+            ],
+
+            backgroundColor: [
+                '#e63946',
+                '#a78bfa',
+                '#facc15'
+            ],
+
+            borderColor: [
+                '#c92a36',
+                '#7c3aed',
+                '#d97706'
+            ],
+
+            borderWidth: 1
+        }]
+    },
+
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    precision: 0
+                },
+                title: {
+                    display: true,
+                    text: 'Number of Features'
+                }
+            },
+
+            x: {
+                title: {
+                    display: true,
+                    text: 'GIS Layers'
+                }
+            }
+        },
+
+        plugins: {
+            legend: {
+                display: true
+            }
+        }
+    }
+});
+
+
+
+    // OpenStreetMap background layer
+    const osmLayer = L.tileLayer(
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+        }
+    ).addTo(map);
+
+    // Layer on/off controls
+    L.control.layers(
+        {
+            'OpenStreetMap': osmLayer
+        },
+        {
+            'Pathein Roads': roadsLayer,
+            'Pathein Ward B': wardLayer,
+            'Street Lights': streetLightLayer
+        },
+        {
+            collapsed: false
+        }
+    ).addTo(map);
+
+        
+const legend = L.control({
+    position: 'bottomright'
+});
+
+legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'map-legend');
+
+    div.innerHTML = `
+        <h4>Map Legend</h4>
+
+        <div class="legend-item">
+            <span class="legend-line"
+                  style="background:#e63946"></span>
+            <span>Pathein Roads</span>
+        </div>
+
+        <div class="legend-item">
+            <span class="legend-square"
+                  style="background:#a78bfa;
+                         border:2px solid #7c3aed"></span>
+            <span>Pathein Ward B</span>
+        </div>
+
+        <div class="legend-item">
+            <span class="legend-square"
+                  style="background:#facc15;
+                         border:2px solid #d97706"></span>
+            <span>Street Lights</span>
+        </div>
+    `;
+
+    return div;
+};
+
+legend.addTo(map);
+
+
+
+    // Zoom to show all three GIS layers
+    const allBounds = L.featureGroup([
+        roadsLayer,
+        wardLayer,
+        streetLightLayer
+    ]).getBounds();
+
+    if (allBounds.isValid()) {
+        map.fitBounds(allBounds, {
+            padding: [20, 20]
+        });
+    }
+
+    console.log(
+        'Pathein Roads loaded:',
+        roadsLayer.getLayers().length
+    );
+
+    console.log(
+        'Pathein Ward B loaded:',
+        wardLayer.getLayers().length
+    );
+
+    console.log(
+        'Street Lights loaded:',
+        streetLightLayer.getLayers().length
+    );
+})
+.catch(error => {
+    console.error('GeoJSON loading error:', error);
+});
+
+// search bar
+const searchInput = document.getElementById('map-search-input');
+const searchButton = document.getElementById('map-search-button');
+const resetButton = document.getElementById('map-reset-button');
+const searchMessage = document.getElementById('search-message');
+const clearButton = document.getElementById('map-clear-button');
+
+let searchResultsLayer = null;
+
+
+function restoreLayerStyles() {
+    // Restore road styles
+    roadsLayer.eachLayer(layer => {
+        if (layer.setStyle) {
+            layer.setStyle({
+                color: '#e63946',
+                weight: 3,
+                opacity: 0.9
+            });
+        }
+    });
+
+    // Restore ward styles
+    wardLayer.eachLayer(layer => {
+        if (layer.setStyle) {
+            layer.setStyle({
+                color: '#7c3aed',
+                fillColor: '#a78bfa',
+                weight: 2,
+                fillOpacity: 0.35
+            });
+        }
+
+        if (layer.setRadius) {
+            layer.setRadius(5);
+        }
+    });
+
+    // Restore street light styles
+    if (streetLightLayer) {
+        streetLightLayer.eachLayer(layer => {
+            if (layer.setRadius) {
+                layer.setRadius(5);
+                layer.setStyle({
+                    color: '#d97706',
+                    fillColor: '#facc15',
+                    fillOpacity: 0.9,
+                    weight: 1
+                });
+            } else if (layer.setStyle) {
+                layer.setStyle({
+                    color: '#d97706',
+                    weight: 2,
+                    fillColor: '#facc15',
+                    fillOpacity: 0.6
+                });
+            }
+        });
+    }
+}
+
+
+function searchMap() {
+    if (!streetLightLayer) {
+        searchMessage.textContent =
+            'Please wait. GIS data is still loading.';
+        return;
+    }
+
+    const query = searchInput.value.trim().toLocaleLowerCase();
+
+    
+if (!query) {
+    // Remove previous search highlights
+    if (searchResultsLayer) {
+        map.removeLayer(searchResultsLayer);
+        searchResultsLayer = null;
+    }
+
+    // Clear previous results
+const resultsList = document.getElementById(
+    'search-results-list'
+);
+
+resultsList.replaceChildren();
+
+    document.getElementById('search-results-title')
+        .textContent = 'Search Results (0)';
+
+    // Display a helpful message
+    searchMessage.textContent =
+        'Please enter a keyword to search the map.';
+
+    // Keep the floating window visible
+    document.getElementById('search-results-window')
+        .style.display = 'flex';
+
+    return;
+}
+
+
+    if (searchResultsLayer) {
+        map.removeLayer(searchResultsLayer);
+        searchResultsLayer = null;
+    }
+
+    
+const sourceLayers = [
+    { name: 'Pathein Roads', layer: roadsLayer },
+    { name: 'Pathein Ward B', layer: wardLayer },
+    { name: 'Street Lights', layer: streetLightLayer }
+].filter(source => map.hasLayer(source.layer));
+
+
+if (sourceLayers.length === 0) {
+    searchMessage.textContent =
+        'No GIS layers are visible. Turn on a layer and try again.';
+
+    document.getElementById('search-results-list')
+        .replaceChildren();
+
+    document.getElementById('search-results-title')
+        .textContent = 'Search Results (0)';
+
+    document.getElementById('search-results-window')
+        .style.display = 'flex';
+
+    return;
+}
+
+
+
+    const matches = [];
+
+    sourceLayers.forEach(source => {
+        source.layer.eachLayer(layer => {
+            const properties = layer.feature?.properties || {};
+
+            const searchableText = Object.entries(properties)
+                .map(([key, value]) => `${key} ${value ?? ''}`)
+                .join(' ')
+                .toLocaleLowerCase();
+
+            if (searchableText.includes(query)) {
+                matches.push({
+                    layer,
+                    sourceName: source.name
+                });
+            }
+        });
+    });
+
+    if (matches.length === 0) {
+
+        map.closePopup();
+        
+    searchMessage.textContent =
+        `No features found for "${searchInput.value.trim()}".`;
+
+    document.getElementById('search-results-list').replaceChildren();
+
+    document.getElementById('search-results-title').textContent =
+        'Search Results (0)';
+
+    document.getElementById('search-results-window').style.display =
+        'flex';
+
+    return;
+    }
+
+
+    // Create a separate overlay for search highlights.
+    // Keep the original GIS layers unchanged.
+    searchResultsLayer = L.featureGroup(
+        matches.map(match => {
+            const layer = match.layer;
+
+            // Create a separate highlighted copy of each feature.
+            if (layer.feature) {
+                return L.geoJSON(layer.feature, {
+                    style: {
+                        color: '#00FFFF',
+                        weight: 5,
+                        fillColor: '#00FFFF',
+                        fillOpacity: 0.7
+                    },
+
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 9,
+                            color: '#00FFFF',
+                            fillColor: '#00FFFF',
+                            weight: 3,
+                            fillOpacity: 1
+                        });
+                    }
+                });
+            }
+
+            return null;
+        }).filter(Boolean)
+    ).addTo(map);
+
+
+    const bounds = searchResultsLayer.getBounds();
+
+    if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
+    }
+
+    matches[0].layer.openPopup();
+
+    searchMessage.textContent =
+    `Found ${matches.length} matching feature(s).`;
+
+    document.getElementById('search-results-title').textContent =
+    `Search Results (${matches.length})`;
+
+    document.getElementById('search-results-window').style.display =
+    'flex';
+
+const resultsList = document.getElementById(
+    'search-results-list'
+);
+
+resultsList.replaceChildren();
+
+
+
+
+matches.forEach((match, index) => {
+    const properties = match.layer.feature?.properties || {};
+
+    const featureName =
+        properties.name ??
+        properties.NAME ??
+        properties.Name ??
+        properties.road_name ??
+        properties.ROAD_NAME ??
+        properties.id ??
+        properties.ID ??
+        `Feature ${index + 1}`;
+
+    // Result container
+    const item = document.createElement('div');
+    item.className = 'search-result-item';
+
+    // Feature name
+    const name = document.createElement('div');
+    name.className = 'search-result-name';
+    name.textContent = String(featureName);
+
+    // Feature type
+    const type = document.createElement('div');
+    type.className = 'search-result-type';
+    type.textContent = `Type: ${match.sourceName}`;
+
+    // Separate Zoom button
+    const zoomButton = document.createElement('button');
+    zoomButton.type = 'button';
+    zoomButton.className = 'search-result-zoom';
+    zoomButton.textContent = 'Zoom to feature';
+
+    zoomButton.addEventListener('click', event => {
+        event.stopPropagation();
+
+        const layer = match.layer;
+
+        if (typeof layer.getBounds === 'function') {
+            const bounds = layer.getBounds();
+
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, {
+                    padding: [30, 30],
+                    maxZoom: 17
+                });
+            }
+        } else if (typeof layer.getLatLng === 'function') {
+            map.setView(layer.getLatLng(), 17);
+        }
+
+        if (typeof layer.openPopup === 'function') {
+            layer.openPopup();
+        }
+    });
+
+    item.appendChild(name);
+    item.appendChild(type);
+    item.appendChild(zoomButton);
+
+    resultsList.appendChild(item);
+});
+
+}
+
+
+clearButton.addEventListener('click', () => {
+    // Remove search highlights only
+    if (searchResultsLayer) {
+        map.removeLayer(searchResultsLayer);
+        searchResultsLayer = null;
+    }
+
+    // Clear the search input and results
+    searchInput.value = '';
+
+    document.getElementById('search-results-list')
+        .replaceChildren();
+
+    document.getElementById('search-results-title')
+        .textContent = 'Search Results';
+
+    searchMessage.textContent =
+        'Enter a keyword to search the map.';
+
+    // Close any open popup
+    map.closePopup();
+
+    // Hide the floating results window
+    document.getElementById('search-results-window')
+        .style.display = 'none';
+});
+
+
+searchButton.addEventListener('click', searchMap);
+
+searchInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+        searchMap();
+    }
+});
+
+
+
+
+resetButton.addEventListener('click', () => {
+    // Make sure the GeoJSON data has loaded
+    if (
+        !roadsGeoJSONData ||
+        !wardGeoJSONData ||
+        !streetLightGeoJSONData ||
+        !streetLightLayer
+    ) {
+        searchMessage.textContent =
+            'Please wait. GIS data is still loading.';
+        return;
+    }
+
+    // Remove search result references before rebuilding layers
+    if (searchResultsLayer) {
+        map.removeLayer(searchResultsLayer);
+        searchResultsLayer = null;
+    }
+
+    // Close any open popup
+    map.closePopup();
+
+    // Rebuild roads from original GeoJSON
+    roadsLayer.clearLayers();
+    roadsLayer.addData(roadsGeoJSONData);
+
+    // Rebuild wards from original GeoJSON
+    wardLayer.clearLayers();
+    wardLayer.addData(wardGeoJSONData);
+
+    // Rebuild street lights from original GeoJSON
+    streetLightLayer.clearLayers();
+    streetLightLayer.addData(streetLightGeoJSONData);
+
+    // Restore all three layers to the map
+    roadsLayer.addTo(map);
+    wardLayer.addTo(map);
+    streetLightLayer.addTo(map);
+
+    // Clear search input and results
+    searchInput.value = '';
+
+    document.getElementById('search-results-list')
+        .replaceChildren();
+
+    document.getElementById('search-results-title')
+        .textContent = 'Search Results';
+
+    searchMessage.textContent =
+        'Enter a keyword to search the map.';
+
+    // Hide and reset the floating window
+    resultsWindow.style.display = 'none';
+    resultsWindow.style.left = 'auto';
+    resultsWindow.style.right = '15px';
+    resultsWindow.style.top = '15px';
+
+    // Zoom to all original features
+    const allBounds = L.featureGroup([
+        roadsLayer,
+        wardLayer,
+        streetLightLayer
+    ]).getBounds();
+
+    if (allBounds.isValid()) {
+        map.fitBounds(allBounds, {
+            padding: [20, 20]
+        });
+    }
+
+    // Refresh map rendering
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 150);
+
+    console.log('GIS layers successfully reset.');
+});
+
+
+
+
+document.getElementById('close-search-results')
+    .addEventListener('click', () => {
+        document.getElementById('search-results-window')
+            .style.display = 'none';
+    });
+
+    
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+        const resultsWindow = document.getElementById(
+            'search-results-window'
+        );
+
+        if (resultsWindow.style.display === 'flex') {
+            resultsWindow.style.display = 'none';
+        }
+    }
+});
+
+
+
+    
+const resultsWindow = document.getElementById(
+    'search-results-window'
+);
+
+const resultsHeader = resultsWindow.querySelector(
+    '.search-results-header'
+);
+
+const mapContainer = document.getElementById('map');
+
+// ADD THESE TWO LINES
+L.DomEvent.disableClickPropagation(resultsWindow);
+L.DomEvent.disableScrollPropagation(resultsWindow);
+
+let isDraggingResults = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let windowStartLeft = 0;
+let windowStartTop = 0;
+
+resultsHeader.addEventListener('pointerdown', event => {
+    // Don't start dragging when clicking the close button
+    if (event.target.closest('button')) return;
+
+    isDraggingResults = true;
+
+    const windowRect = resultsWindow.getBoundingClientRect();
+
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    windowStartLeft = resultsWindow.offsetLeft;
+    windowStartTop = resultsWindow.offsetTop;
+
+    // Switch from right positioning to left positioning
+    resultsWindow.style.right = 'auto';
+    resultsHeader.setPointerCapture(event.pointerId);
+});
+
+resultsHeader.addEventListener('pointermove', event => {
+    if (!isDraggingResults) return;
+
+    const dx = event.clientX - dragStartX;
+    const dy = event.clientY - dragStartY;
+
+    const maxLeft = mapContainer.clientWidth -
+        resultsWindow.offsetWidth;
+
+    const maxTop = mapContainer.clientHeight -
+        resultsWindow.offsetHeight;
+
+    const newLeft = Math.max(
+        0,
+        Math.min(maxLeft, windowStartLeft + dx)
+    );
+
+    const newTop = Math.max(
+        0,
+        Math.min(maxTop, windowStartTop + dy)
+    );
+
+    resultsWindow.style.left = `${newLeft}px`;
+    resultsWindow.style.top = `${newTop}px`;
+});
+
+function stopDraggingResults() {
+    isDraggingResults = false;
+}
+
+resultsHeader.addEventListener(
+    'pointerup',
+    stopDraggingResults
+);
+
+resultsHeader.addEventListener(
+    'pointercancel',
+    stopDraggingResults
+);
+
+
+
+
+
+    </script>
+
+</body>
+</html>
